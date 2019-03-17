@@ -1,0 +1,13 @@
+spring:
+  profile:
+    active: dev
+  redis:
+    cluster:
+      nodes:
+      - localhost:16379
+      - localhost:16380
+    host: localhost
+    port: 6379
+    session-cache:
+      ttl: 10
+
