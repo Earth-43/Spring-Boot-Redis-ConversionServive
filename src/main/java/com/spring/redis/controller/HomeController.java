@@ -1,9 +1,12 @@
 package com.spring.redis.controller;
 
+import com.spring.redis.cache.UserCacheKey;
+import com.spring.redis.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,9 +26,13 @@ public class HomeController {
 
 
     @Autowired
-    @Qualifier("optionsCacheManager")
-    private RedisCacheManager optionsCacheManager;
+    @Qualifier("userCacheManager")
+    private RedisCacheManager userCacheManager;
 
+    @Autowired
+    private UserService userService;
+
+    /*Request mappings are not upto the rest standards so please dont' judge :) */
 
     @RequestMapping("/")
     public String index() {
@@ -39,9 +46,7 @@ public class HomeController {
     @PostMapping("/set-key")
     public String setKey() {
         Cache sessionCache = sessionCacheManager.getCache("session-cache");
-        Cache optionsCache = optionsCacheManager.getCache("options-cache");
         sessionCache.put("_first_token", new Date().getTime());
-        optionsCache.put("_first_options", new Date().getTime());
         return "Done the job";
     }
 
@@ -57,6 +62,22 @@ public class HomeController {
         }
         testMap.put("key-exist", false);
         return testMap;
+    }
+
+    // Should return user object instead of map
+    @GetMapping("/user-data")
+    public Map getUserData() {
+        Cache userCache = userCacheManager.getCache("user-cache");
+        UserCacheKey userCacheKey = new UserCacheKey("some-data-from-request");
+        Cache.ValueWrapper result = userCache != null ? userCache.get(userCacheKey) : null;
+        Map<String, String> userData = result == null ? null : (Map<String, String>) result.get();
+        if (CollectionUtils.isEmpty(userData)) {
+            String userId = String.valueOf(userService.getUserId(userCacheKey));
+            String cacheKey = String.format("%s_%s", userId, "$user_data$");
+            userCache.put(cacheKey, userId);
+        }
+
+        return userData;
     }
 
 }

@@ -1,5 +1,8 @@
 package com.spring.redis.configuration;
 
+import com.spring.redis.cache.UserCacheKey;
+import com.spring.redis.cache.UserCacheKeyConverter;
+import com.spring.redis.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
@@ -14,6 +17,9 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisClientConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.format.support.DefaultFormattingConversionService;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -64,16 +70,26 @@ public class RedisConfiguration {
                 .build();
     }
 
-    @Bean(name = "optionsCacheManager")
-    public RedisCacheManager optionsCacheManager(RedisConnectionFactory connectionFactory) {
-        RedisCacheConfiguration sessionCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofSeconds(600))
+    @Bean(name = "userCacheManager")
+    public RedisCacheManager userCacheManager(RedisConnectionFactory connectionFactory, UserService userService) {
+        RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig();
+        DefaultFormattingConversionService conversionService = (DefaultFormattingConversionService) redisCacheConfiguration.getConversionService();
+        conversionService.addConverter(UserCacheKey.class, String.class, new UserCacheKeyConverter(userService));
+        redisCacheConfiguration
+                .entryTtl(Duration.ofSeconds(600)).withConversionService(conversionService)
                 .disableCachingNullValues();
-
         return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(sessionCacheConfig)
-                .withInitialCacheConfigurations(Collections.singletonMap("options-cache", sessionCacheConfig))
+                .cacheDefaults(redisCacheConfiguration)
+                .withInitialCacheConfigurations(Collections.singletonMap("user-cache", redisCacheConfiguration))
                 .build();
+    }
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setConnectionFactory(connectionFactory);
+        return redisTemplate;
     }
 
 }
